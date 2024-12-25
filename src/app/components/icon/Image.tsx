@@ -30,7 +30,11 @@ const getSvgImage = (src: string, props: svgProps) => {
     <SvgIcon
       src={src}
       height={props.size}
-      sx={{ bgcolor: (theme) => (props.active ? props.bgcolor ?? theme.palette.primary.main : "currentColor") }}
+      className={props.className}
+      sx={{
+        ...props.sx,
+        bgcolor: (theme) => (props.active ? props.bgcolor ?? theme.palette.primary.main : "currentColor"),
+      }}
     />
   );
 };

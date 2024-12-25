@@ -11,7 +11,7 @@ const numClass = labels.length;
  * @param {Number} modelHeight
  * @returns input tensor, xRatio and yRatio
  */
-const preprocess = (source, modelWidth, modelHeight) => {
+export const preprocess = (source, modelWidth, modelHeight) => {
   let xRatio, yRatio; // ratios for boxes
 
   const input = tf.tidy(() => {
@@ -38,143 +38,66 @@ const preprocess = (source, modelWidth, modelHeight) => {
   return [input, xRatio, yRatio];
 };
 
-// /**
-//  * Function run inference and do detection from source.
-//  * @param {HTMLImageElement|HTMLVideoElement} source
-//  * @param {tf.GraphModel} model loaded YOLOv8 tensorflow.js model
-//  * @param {HTMLCanvasElement} canvasRef canvas reference
-//  * @param {VoidFunction} callback function to run after detection process
-//  */
-// export const detect = async (source, model, canvasRef, callback = () => {}) => {
-//   const [modelWidth, modelHeight] = model.inputShape.slice(1, 3); // get model width and height
-
-//   tf.engine().startScope(); // start scoping tf engine
-//   const [input, xRatio, yRatio] = preprocess(source, modelWidth, modelHeight); // preprocess image
-
-//   const res = model.net.execute(input); // inference model
-//   const transRes = res.transpose([0, 2, 1]); // transpose result [b, det, n] => [b, n, det]
-//   const boxes = tf.tidy(() => {
-//     const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // get width
-//     const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // get height
-//     const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2)); // x1
-//     const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2)); // y1
-//     return tf
-//       .concat(
-//         [
-//           y1,
-//           x1,
-//           tf.add(y1, h), //y2
-//           tf.add(x1, w), //x2
-//         ],
-//         2
-//       )
-//       .squeeze();
-//   }); // process boxes [y1, x1, y2, x2]
-
-//   const [scores, classes] = tf.tidy(() => {
-//     // Slicing to get the class scores correctly
-//     const rawScores = transRes.slice([0, 0, 4], [-1, -1, 1]); // Only get the class score
-//     return [rawScores.squeeze(0).max(1), rawScores.squeeze(0).argMax(1)];
-//   });
-
-//   const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, 0.45, 0.2); // NMS to filter boxes
-
-//   const boxes_data = boxes.gather(nms, 0).dataSync(); // indexing boxes by nms index
-//   const scores_data = scores.gather(nms, 0).dataSync(); // indexing scores by nms index
-//   const classes_data = classes.gather(nms, 0).dataSync(); // indexing classes by nms index
-
-//   renderBoxes(canvasRef, boxes_data, scores_data, classes_data, [xRatio, yRatio]); // render boxes
-//   tf.dispose([res, transRes, boxes, scores, classes, nms]); // clear memory
-
-//   callback();
-
-//   tf.engine().endScope(); // end of scoping
-// };
-
 /**
  * Function run inference and do detection from source.
  * @param {HTMLImageElement|HTMLVideoElement} source
- * @param {tf.GraphModel} detectionModel loaded YOLOv8 model
- * @param {tf.GraphModel} classificationModel loaded classification model
+ * @param {tf.GraphModel} model loaded YOLOv8 tensorflow.js model
  * @param {HTMLCanvasElement} canvasRef canvas reference
  * @param {VoidFunction} callback function to run after detection process
  */
-export const detectAndClassify = async (
-  source,
-  detectionModel,
-  classificationModel,
-  canvasRef,
-  callback = () => {}
-) => {
-  const [modelWidth, modelHeight] = detectionModel.inputShape.slice(1, 3); // detection model input size
+export const detect = async (source, model, classificationModel, canvasRef, previewRef, callback = () => {}) => {
+  const [modelWidth, modelHeight] = model.inputShape.slice(1, 3); // get model width and height
 
   tf.engine().startScope(); // start scoping tf engine
   const [input, xRatio, yRatio] = preprocess(source, modelWidth, modelHeight); // preprocess image
 
-  const res = detectionModel.net.execute(input); // inference detection model
+  const res = model.net.execute(input); // inference model
   const transRes = res.transpose([0, 2, 1]); // transpose result [b, det, n] => [b, n, det]
   const boxes = tf.tidy(() => {
-    const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // width
-    const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // height
+    const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // get width
+    const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // get height
     const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2)); // x1
     const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2)); // y1
     return tf
       .concat(
         [
-          y1, // y1
-          x1, // x1
-          tf.add(y1, h), // y2
-          tf.add(x1, w), // x2
+          y1,
+          x1,
+          tf.add(y1, h), //y2
+          tf.add(x1, w), //x2
         ],
         2
       )
       .squeeze();
-  });
+  }); // process boxes [y1, x1, y2, x2]
 
   const [scores, classes] = tf.tidy(() => {
-    const rawScores = transRes.slice([0, 0, 4], [-1, -1, 1]); // class scores
+    // Slicing to get the class scores correctly
+    const rawScores = transRes.slice([0, 0, 4], [-1, -1, 1]); // Only get the class score
     return [rawScores.squeeze(0).max(1), rawScores.squeeze(0).argMax(1)];
   });
 
-  const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, 0.45, 0.2); // NMS
+  const nms = await tf.image.nonMaxSuppressionAsync(boxes, scores, 500, 0.45, 0.2); // NMS to filter boxes
 
-  const boxes_data = boxes.gather(nms, 0).arraySync(); // convert to JS array
-  const scores_data = scores.gather(nms, 0).arraySync();
-  const classes_data = classes.gather(nms, 0).arraySync();
+  const boxes_data = boxes.gather(nms, 0).dataSync(); // indexing boxes by nms index
+  const scores_data = scores.gather(nms, 0).dataSync(); // indexing scores by nms index
+  const classes_data = classes.gather(nms, 0).dataSync(); // indexing classes by nms index
 
-  // ** Crop and classify each detected region **
-  // const croppedClassifications = await Promise.all(
-  //   boxes_data.map(async (box, idx) => {
-  //     const [y1, x1, y2, x2] = box.map((coord, i) => (i % 2 === 0 ? coord / yRatio : coord / xRatio)); // scale back to original dimensions
-
-  //     const croppedCanvas = document.createElement("canvas");
-  //     const ctx = croppedCanvas.getContext("2d");
-  //     croppedCanvas.width = x2 - x1;
-  //     croppedCanvas.height = y2 - y1;
-
-  //     ctx.drawImage(source, x1, y1, x2 - x1, y2 - y1, 0, 0, croppedCanvas.width, croppedCanvas.height);
-
-  //     const croppedTensor = tf.browser
-  //       .fromPixels(croppedCanvas)
-  //       .resizeBilinear([224, 224]) // Adjust to classification model input size
-  //       .div(255.0)
-  //       .expandDims(0); // Normalize and add batch dimension
-
-  //     const prediction = classificationModel.predict(croppedTensor);
-  //     const label = (await prediction.argMax(-1).data())[0]; // Get predicted label
-  //     tf.dispose(croppedTensor); // Dispose tensor
-
-  //     return { label, score: scores_data[idx], bbox: box };
-  //   })
-  // );
-
-  renderBoxes(canvasRef, boxes_data, scores_data, classes_data, [xRatio, yRatio]); // Render detection boxes
-
-  // console.log("Classifications:", croppedClassifications); // Log results
+  renderBoxes(
+    source,
+    canvasRef,
+    previewRef,
+    boxes_data,
+    scores_data,
+    classes_data,
+    [xRatio, yRatio],
+    classificationModel
+  ); // render boxes
   tf.dispose([res, transRes, boxes, scores, classes, nms]); // clear memory
+
   callback();
 
-  tf.engine().endScope(); // end scoping
+  tf.engine().endScope(); // end of scoping
 };
 
 /**
@@ -183,9 +106,7 @@ export const detectAndClassify = async (
  * @param {tf.GraphModel} model loaded YOLOv8 tensorflow.js model
  * @param {HTMLCanvasElement} canvasRef canvas reference
  */
-export const detectVideo = (vidSource, detectionModel, classificationModel, canvasRef) => {
-  console.log({ vidSource, detectionModel, classificationModel, canvasRef });
-
+export const detectVideo = (vidSource, detectionModel, classificationModel, canvasRef, previewRef) => {
   /**
    * Function to detect every frame from video
    */
@@ -196,7 +117,7 @@ export const detectVideo = (vidSource, detectionModel, classificationModel, canv
       return; // handle if source is closed
     }
 
-    detectAndClassify(vidSource, detectionModel, classificationModel, canvasRef, () => {
+    detect(vidSource, detectionModel, classificationModel, canvasRef, previewRef, () => {
       requestAnimationFrame(detectFrame); // get another frame
     });
   };

@@ -7,6 +7,7 @@ import CustomSelect from "../../components/select/custom-select";
 import { SVG } from "../../components/icon/Image";
 
 const StartRealTime = () => {
+  const [modelName, setModelName] = useState<any>("mobile_net");
   const [memoryInfo, setMemoryInfo] = useState<any>(tf.memory());
   const [cameraFacingMode, setCameraFacingMode] = useState("environment");
   const [loading, setLoading] = useState({ loading: true, progress: 10 });
@@ -23,32 +24,47 @@ const StartRealTime = () => {
 
   const cameraRef: any = useRef(null);
   const canvasRef: any = useRef(null);
+  const previewRef: any = useRef(null);
 
   useEffect(() => {
-    tf.ready()
-      .then(async () => {
-        const detectionModel: any = await tf.loadGraphModel("detection_web_model/model.json"); // Load detection model
-        const classificationModel: any = await tf.loadGraphModel("classification_web_model/mobile_net/model.json"); // Load classification model
+    let previousDetectionModel: any = detectionModel.net;
+    let previousClassificationModel: any = classificationModel;
 
+    const loadModel = async (name: string) => {
+      try {
         setLoading({ loading: true, progress: 50 });
 
-        // Warmup detection model
-        const dummyInput = tf.ones(detectionModel.inputs[0].shape);
-        const warmupResults = detectionModel.execute(dummyInput);
+        // Dispose previous models if they exist
+        if (previousDetectionModel) previousDetectionModel.dispose();
+        if (previousClassificationModel) previousClassificationModel.dispose();
+
+        // Load new models
+        const detectionModel = await tf.loadGraphModel("detection_web_model/model.json");
+        const classificationModel = await tf.loadGraphModel(`classification_web_model/${name}/model.json`);
+
         setDetectionModel({
           net: detectionModel,
           inputShape: detectionModel.inputs[0].shape,
         });
 
-        setClassificationModel(classificationModel); // Set classification model
-        tf.dispose([warmupResults, dummyInput]); // Clean up memory
-      })
-      .finally(() => {
+        setClassificationModel(classificationModel); // Set the classification model
+      } catch (error) {
+        console.error("Error loading models", error);
+      } finally {
         setTimeout(() => setLoading({ loading: true, progress: 75 }), 1000);
         setTimeout(() => setLoading({ loading: true, progress: 100 }), 1500);
         setTimeout(() => setLoading({ loading: false, progress: 100 }), 2500);
-      });
-  }, []);
+      }
+    };
+
+    loadModel(modelName);
+
+    // Return a cleanup function to dispose of models when the component unmounts
+    return () => {
+      if (previousDetectionModel) previousDetectionModel.dispose();
+      if (previousClassificationModel) previousClassificationModel.dispose();
+    };
+  }, [modelName]);
 
   useEffect(() => {
     let stream: any = null;
@@ -91,7 +107,7 @@ const StartRealTime = () => {
   };
 
   return (
-    <Stack py={2} gap={2}>
+    <Stack height={1} py={2} gap={2}>
       <Stack px={2} gap={4} direction={{ md: "row" }}>
         <Grid container color={"grey.700"} maxWidth={450}>
           <Grid item xs={12} sm={6}>
@@ -126,26 +142,33 @@ const StartRealTime = () => {
             defaultValue={"resnet50"}
             label="Choose Classification model"
             variant="outlined"
+            value={modelName}
             lists={[
-              { label: "Resnet-50", value: "resnet50" },
-              { label: "VGG-19", value: "vgg19" },
-              { label: "DenseNet-169", value: "densenet169" },
-              { label: "EfficientNet-B7", value: "efficientnet_b7" },
-              { label: "MobileNet-V3", value: "mobilenet_v3_large" },
+              { label: "Resnet-50", value: "resnet" },
+              { label: "VGG-19", value: "vgg" },
+              { label: "DenseNet-169", value: "dense_net" },
+              { label: "EfficientNet-B7", value: "efficient_net" },
+              { label: "MobileNet-V3", value: "mobile_net" },
             ]}
+            onChange={(e) => {
+              setModelName(null);
+              setTimeout(() => {
+                setModelName(e.target.value);
+              }, 100);
+            }}
           />
         </Stack>
       </Stack>
       <Divider />
 
-      <Stack px={{ xs: 1, sm: 4 }} gap={1}>
+      <Stack flex={1} px={{ xs: 1, sm: 4 }} gap={1}>
         <Typography variant="h6">Detecting Hands</Typography>
         <Box
+          maxHeight={480}
+          overflow={"hidden"}
           position={"relative"}
           display={"inline-block"}
           maxWidth={{ xs: 1, sm: 640 }}
-          maxHeight={480}
-          overflow={"hidden"}
         >
           <Box
             muted
@@ -156,7 +179,9 @@ const StartRealTime = () => {
             ref={cameraRef}
             component={"video"}
             borderRadius={2}
-            onPlay={() => detectVideo(cameraRef.current, detectionModel, classificationModel, canvasRef.current)}
+            onPlay={() =>
+              detectVideo(cameraRef.current, detectionModel, classificationModel, canvasRef.current, previewRef.current)
+            }
           />
           <canvas
             className="realtimeCanvas"

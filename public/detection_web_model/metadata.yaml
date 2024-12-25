@@ -1,7 +1,7 @@
-description: Ultralytics best model trained on Detection_2/custom.yaml
+description: Ultralytics best model trained on collect_data_detection/custom.yaml
 author: Ultralytics
-date: '2024-10-19T16:23:21.082383'
-version: 8.3.17
+date: '2024-11-30T15:21:25.534792'
+version: 8.3.39
 license: AGPL-3.0 License (https://ultralytics.com/license)
 docs: https://docs.ultralytics.com
 stride: 32

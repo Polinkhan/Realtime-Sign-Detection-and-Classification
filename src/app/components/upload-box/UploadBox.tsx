@@ -3,9 +3,8 @@ import { SxProps, alpha } from "@mui/material/styles";
 import Box from "@mui/material/Box";
 import { ReactNode } from "react";
 import { Stack, Typography } from "@mui/material";
-import SvgIcon from "../icon/SvgIcon";
-import { SVGICON } from "../images/Image";
 import CustomButton from "../Buttons/CustomButton";
+import { SVG } from "../icon/Image";
 
 interface UploadProps extends DropzoneOptions {
   size?: "small" | "medium";
@@ -13,6 +12,7 @@ interface UploadProps extends DropzoneOptions {
   disabled?: boolean;
   error?: any;
   sx?: SxProps;
+  imgSx?: SxProps;
   onDrop: any;
   file: any;
   reset?: any;
@@ -21,7 +21,7 @@ interface UploadProps extends DropzoneOptions {
   };
 }
 
-const UploadBox = ({ placeholder, error, disabled, sx, accept, file, ...other }: UploadProps) => {
+const UploadBox = ({ placeholder, error, disabled, sx, accept, file, imgSx, ...other }: UploadProps) => {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ disabled, accept, ...other });
 
   const hasFile = file != null;
@@ -31,10 +31,11 @@ const UploadBox = ({ placeholder, error, disabled, sx, accept, file, ...other }:
       {...getRootProps()}
       sx={{
         width: 1,
-        height: 120,
+        height: 350,
+        padding: 4,
         flexShrink: 0,
         display: "flex",
-        borderRadius: 1,
+        borderRadius: 4,
         cursor: "pointer",
         alignItems: "center",
         color: "text.disabled",
@@ -65,25 +66,38 @@ const UploadBox = ({ placeholder, error, disabled, sx, accept, file, ...other }:
     >
       <input {...getInputProps()} />
 
-      <Stack spacing={0.5} alignItems="center" sx={{ color: "text.disabled" }}>
+      <Stack spacing={2} alignItems="center" sx={{ color: "text.disabled" }}>
         {file ? (
-          <Typography height={40} variant="body2" color={"primary"} fontWeight={"bold"}>
-            {file.name}
-          </Typography>
+          <Box
+            component={"img"}
+            sx={{ objectFit: "fill", width: 244, height: 244, borderRadius: 2, ...imgSx }}
+            src={typeof file === "string" ? file : URL.createObjectURL(file)}
+          />
         ) : (
-          <SvgIcon src={SVGICON.Upload} height={50} sx={{ bgcolor: "currentcolor" }} />
+          <>
+            <SVG.image size={150} />
+          </>
         )}
         {file ? (
-          <Typography variant="body2">Drag or click to change file</Typography>
+          <Typography>Drag or click to change file</Typography>
         ) : (
-          <Typography variant="body2">{placeholder ?? "Drag or click to upload"}</Typography>
+          <Typography>{placeholder ?? "Drag or click to upload"}</Typography>
         )}
       </Stack>
     </Box>
   );
 };
 
-export const UploadImageBox = ({ size = "medium", placeholder, error, disabled, sx, file, reset, ...other }: UploadProps) => {
+export const UploadImageBox = ({
+  size = "medium",
+  placeholder,
+  error,
+  disabled,
+  sx,
+  file,
+  reset,
+  ...other
+}: UploadProps) => {
   const accept: Accept = {
     jpg: ["image/jpeg"],
     jpeg: ["image/jpeg"],
@@ -164,7 +178,7 @@ export const UploadImageBox = ({ size = "medium", placeholder, error, disabled, 
             </Stack>
           ) : (
             <>
-              <SvgIcon src={SVGICON.ImgAdd} height={50} sx={{ bgcolor: "currentcolor" }} />
+              {/* <SvgIcon src={SVGICON.ImgAdd} height={50} sx={{ bgcolor: "currentcolor" }} /> */}
               <Typography variant="body2">{placeholder ?? "Drag or click to upload image"}</Typography>
             </>
           )}
